@@ -136,13 +136,29 @@ export default async function({login, data, rest, q, account, imports}, {enabled
             }
             //Pushed commits
             case "PushEvent": {
-              let {size, commits, ref} = payload
-              commits = commits.filter(({author: {email}}) => imports.filters.text(email, ignored))
+              let {size, commits, ref} = payload ?? {}
+              commits = Array.isArray(commits) ? commits : []
+              commits = commits.filter((commit) => {
+                const email = commit?.author?.email
+                if (!email)
+                  return false
+                return imports.filters.text(email, ignored)
+              })
               if (!commits.length)
                 return null
               if (commits.slice(-1).pop()?.message.startsWith("Merge branch "))
                 commits = commits.slice(-1)
-              return {type: "push", actor, timestamp, repo, size, branch: ref.match(/refs.heads.(?<branch>.*)/)?.groups?.branch ?? null, commits: commits.reverse().map(({sha, message}) => ({sha: sha.substring(0, 7), message}))}
+              return {
+                type: "push",
+                actor,
+                timestamp,
+                repo,
+                size,
+                branch: ref?.match(/refs.heads.(?<branch>.*)/)?.groups?.branch ?? null,
+                commits: commits
+                  .reverse()
+                  .map(({sha, message}) => ({sha: (sha ?? "").substring(0, 7), message})),
+              }
             }
             //Released
             case "ReleaseEvent": {
